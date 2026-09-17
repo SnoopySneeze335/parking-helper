@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#d32bed" />
+    <meta name="description" content="An offline navigation prototype for Parking Helper." />
+    <title>Parking Helper</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main id="app" class="app-shell" aria-live="polite">
+      <header class="app-header">
+        <button id="backButton" class="icon-button back-button" type="button" aria-label="Go back"><span aria-hidden="true">&#8592;</span></button>
+        <button id="homeButton" class="wordmark" type="button" aria-label="Return to main menu">parking helper</button>
+        <button id="settingsButton" class="icon-button settings-button" type="button" aria-label="Open settings"><span aria-hidden="true">&#9881;</span></button>
+      </header>
+      <section id="screen" class="screen" tabindex="-1"></section>
+    </main>
+    <div id="settingsOverlay" class="overlay" hidden>
+      <button class="overlay-scrim" type="button" data-close-settings aria-label="Close settings"></button>
+      <aside class="settings-sheet" aria-labelledby="settingsTitle">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <div class="sheet-heading">
+          <div><p class="eyebrow dark">Preferences</p><h2 id="settingsTitle">Settings</h2></div>
+          <button class="sheet-close" type="button" data-close-settings aria-label="Close settings">&#215;</button>
+        </div>
+        <div class="settings-list">
+          <button class="settings-row" type="button" data-settings-action="vehicle">
+            <span class="settings-row-icon" aria-hidden="true">&#9670;</span>
+            <span><strong>Change my vehicle</strong><small>Type and color</small></span><span aria-hidden="true">&#8250;</span>
+          </button>
+          <button class="settings-row" type="button" data-settings-action="about">
+            <span class="settings-row-icon" aria-hidden="true">i</span>
+            <span><strong>About Parking Helper</strong><small>Project information</small></span><span aria-hidden="true">&#8250;</span>
+          </button>
+        </div>
+      </aside>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <script src="app.js"></script>
+  </body>
+</html>
