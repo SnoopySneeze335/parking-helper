@@ -535,6 +535,10 @@ h2 { margin-bottom: 8px; font-size: clamp(1.7rem, 7vw, 2.3rem); line-height: 1; 
   transform: translateX(50%);
 }
 
+.floating-save:hover {
+  transform: translateX(50%) translateY(-2px);
+}
+
 .garage-hint {
   position: absolute;
   z-index: 7;
