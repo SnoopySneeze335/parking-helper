@@ -165,7 +165,7 @@
         <h1>Keep your parking data with you.</h1>
         <p class="lede">Add Parking Helper to your home screen so your saved spot, vehicle, and preferences are not lost.</p>
         <p class="lede" style="margin-top: 18px">Home screen installation steps will be added here in a future version.</p>
-        <button class="primary-button bottom-action full" type="button" data-action="warning-okay">okay</button>
+        <button class="primary-button bottom-action full" type="button" data-action="warning-okay">I Understand</button>
       </div>`;
   }
 
