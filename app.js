@@ -10,15 +10,15 @@
   const demoHistory = flags.emptyHistory
     ? []
     : [
-        { id: "r4-l2-b-5", relative: "2 hours ago", date: "9/2/26", level: 2, zone: "B", stall: 5 },
-        { id: "r4-l4-d-zone", relative: null, date: "8/24/26", level: 4, zone: "D", stall: null },
-        { id: "r4-l1-a-2", relative: null, date: "7/18/26", level: 1, zone: "A", stall: 2 },
+        // { id: "r4-l2-b-5", relative: "2 hours ago", date: "9/2/26", level: 2, zone: "B", stall: 5 },
+        // { id: "r4-l4-d-zone", relative: null, date: "8/24/26", level: 4, zone: "D", stall: null },
+        // { id: "r4-l1-a-2", relative: null, date: "7/18/26", level: 1, zone: "A", stall: 2 },
       ];
 
   const state = {
     screen: flags.firstTime ? "warning" : "welcome",
     stack: [],
-    selectedVehicle: "sedan",
+    selectedVehicle: "Sedan",
     selectedColor: "red",
     selectedLevel: null,
     selectedZone: null,
@@ -150,9 +150,9 @@
         </div>
         <div class="garage-orbit">${cubeMarkup()}</div>
         <div class="welcome-actions">
-          <button class="primary-button" type="button" data-action="retrieve">find my car</button>
-          <button class="primary-button" type="button" data-action="save">save where you parked</button>
-          <button class="text-button" type="button" data-action="history">see past vehicle locations</button>
+          <button class="primary-button" type="button" data-action="retrieve">Find my car</button>
+          <button class="primary-button" type="button" data-action="save">Save where you parked</button>
+          <button class="text-button" type="button" data-action="history">See my past vehicle locations</button>
         </div>
       </div>`;
   }
@@ -174,14 +174,14 @@
       <div class="screen-purple intro-layout">
         <div class="intro-icon" aria-hidden="true"></div>
         <p class="eyebrow">Welcome</p>
-        <h1>parking helper</h1>
-        <p class="lede" style="margin-inline: auto">A small head start makes finding your car much easier.</p>
-        <button class="primary-button" type="button" data-action="choose-vehicle">select my vehicle</button>
+        <h1>Setup</h1>
+        <p class="lede" style="margin-inline: auto">Let's start by selecting your vehicle</p>
+        <button class="primary-button" type="button" data-action="choose-vehicle">Continue</button>
       </div>`;
   }
 
   function renderVehicleSelection() {
-    const vehicles = ["sedan", "suv", "truck", "motorcycle"];
+    const vehicles = ["Sedan", "SUV", "Truck", "Motorcycle"];
     return `
       <div class="screen-light selection-layout">
         <span class="step-count">Vehicle setup · 1 of 2</span>
@@ -196,7 +196,7 @@
             </button>`).join("")}
         </div>
         <div class="sticky-footer">
-          <button class="primary-button dark full" type="button" data-action="choose-color">continue with ${state.selectedVehicle}</button>
+          <button class="primary-button dark full" type="button" data-action="choose-color">Continue with ${state.selectedVehicle}</button>
         </div>
       </div>`;
   }
@@ -214,7 +214,7 @@
             <button class="swatch${state.selectedColor === name ? " selected" : ""}" type="button" data-color="${name}" style="--swatch: ${color}" role="radio" aria-checked="${state.selectedColor === name}" aria-label="${name}"></button>`).join("")}
         </div>
         <div class="sticky-footer">
-          <button class="primary-button dark full" type="button" data-action="save-vehicle">save my vehicle</button>
+          <button class="primary-button dark full" type="button" data-action="save-vehicle">Save my vehicle</button>
         </div>
       </div>`;
   }
@@ -226,7 +226,7 @@
         <p class="eyebrow">Vehicle saved</p>
         <h1>You’re all set.</h1>
         <p class="lede">You can change your vehicle type or color any time from settings.</p>
-        <button class="primary-button" type="button" data-action="finish-setup">go to parking helper</button>
+        <button class="primary-button" type="button" data-action="finish-setup">Return to parking helper</button>
       </div>`;
   }
 
@@ -263,7 +263,7 @@
           ${garagePlan({ interactive: true, selectedZone: state.selectedZone, selectedStall: state.selectedStall })}
           <div class="garage-hint">${hasZone ? (hasStall ? `Stall ${state.selectedStall} selected` : "Optional: choose a stall") : "Blue outlines are parking zones"}</div>
         </div>
-        ${hasZone ? `<button class="primary-button blue floating-save" type="button" data-action="save-location">${hasStall ? "save spot" : "save zone"}</button>` : ""}
+        ${hasZone ? `<button class="primary-button blue floating-save" type="button" data-action="save-location">${hasStall ? "Save spot" : "Save zone"}</button>` : ""}
       </div>`;
   }
 
@@ -277,7 +277,7 @@
         <p class="eyebrow">Location saved</p>
         <h1>Have a nice day.</h1>
         <p class="lede">${detail}</p>
-        <button class="primary-button" type="button" data-action="home">back to menu</button>
+        <button class="primary-button" type="button" data-action="home">Back to menu</button>
       </div>`;
   }
 
@@ -300,7 +300,7 @@
           ${garagePlan({ parkedLocation: location })}
           <div class="garage-hint">${location.stall ? `Your ${state.selectedColor} ${state.selectedVehicle}` : `Saved zone ${location.zone}`}</div>
         </div>
-        <button class="primary-button dark" type="button" data-action="home">back to menu</button>
+        <button class="primary-button dark" type="button" data-action="home">Back to menu</button>
       </div>`;
   }
 
@@ -311,7 +311,7 @@
         <p class="eyebrow dark">Nothing here yet</p>
         <h1>${title}</h1>
         <p class="lede dark">${message}</p>
-        <button class="primary-button dark" type="button" data-action="home">back to main menu</button>
+        <button class="primary-button dark" type="button" data-action="home">Back to main menu</button>
       </div>`;
   }
 
@@ -434,7 +434,7 @@
           const id = `prototype-${Date.now()}`;
           state.history.unshift({
             id,
-            relative: "just now",
+            relative: "Just now",
             date: "9/2/26",
             level: state.selectedLevel,
             zone: state.selectedZone,
