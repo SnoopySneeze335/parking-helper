@@ -319,6 +319,96 @@ h2 { margin-bottom: 8px; font-size: clamp(1.7rem, 7vw, 2.3rem); line-height: 1; 
 .vehicle-card.selected { border-color: var(--purple); box-shadow: 0 12px 34px rgb(211 43 237 / 18%); }
 .vehicle-card strong { display: block; margin-top: 20px; font-size: 1rem; text-align: center; text-transform: capitalize; }
 
+.vehicle-art {
+  --vehicle-color: #b8b3bd;
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  pointer-events: none;
+  shape-rendering: geometricPrecision;
+}
+
+.vehicle-card .vehicle-art { width: min(150px, 100%); height: 100px; margin: 2px auto 0; }
+.vehicle-model {
+  position: absolute;
+  z-index: 3;
+  top: -32px;
+  left: 50%;
+  display: block;
+  width: 150px;
+  height: 100px;
+  transform: translateX(-50%);
+  opacity: 0;
+  background: transparent;
+  pointer-events: none;
+  transition: opacity 160ms ease;
+}
+
+.vehicle-model-host.model-ready { background: transparent; box-shadow: none; }
+.vehicle-model-host.model-ready::before, .vehicle-model-host.model-ready::after { opacity: 0; }
+.vehicle-model-host.model-ready .vehicle-model { opacity: 1; }
+.vehicle-view-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  align-items: center;
+  width: min(100%, 360px);
+  padding: 6px 10px;
+}
+
+.color-preview .vehicle-view-pair .vehicle-art { width: 100%; max-width: 158px; margin: 0 auto; }
+.vehicle-art .vehicle-paint {
+  fill: var(--vehicle-color);
+  stroke: #151b22;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-opacity: .42;
+  vector-effect: non-scaling-stroke;
+}
+
+.vehicle-art .shade-light { fill: #fff; fill-opacity: .22; }
+.vehicle-art .shade-soft { fill: #fff; fill-opacity: .11; }
+.vehicle-art .shade-mid { fill: #07101a; fill-opacity: .18; }
+.vehicle-art .shade-deep { fill: #020509; fill-opacity: .31; }
+.vehicle-art .ground-shadow { fill: #111923; fill-opacity: .11; }
+.vehicle-art .ground-shadow-soft { fill-opacity: .06; filter: blur(2px); }
+.vehicle-art .glass {
+  fill: #182733;
+  stroke: #091017;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.vehicle-art .glass-glint {
+  fill: none;
+  stroke: #b7e6f5;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-opacity: .48;
+  vector-effect: non-scaling-stroke;
+}
+
+.vehicle-art .wheel-well { fill: #080a0e; }
+.vehicle-art .tire { fill: #15181c; stroke: #060708; stroke-width: 1.5; }
+.vehicle-art .rim { fill: #8b959e; stroke: #30373d; stroke-width: 1.2; }
+.vehicle-art .hub { fill: #d9dde0; }
+.vehicle-art .headlamp { fill: #fff1bb; stroke: #d6bc62; stroke-width: 1; }
+.vehicle-art .headlamp-highlight { fill: #fff; fill-opacity: .7; }
+.vehicle-art .taillamp { fill: #dc3945; stroke: #71131b; stroke-width: 1; }
+.vehicle-art .taillamp-highlight { fill: #ff7a84; }
+.vehicle-art .bumper { fill: #3b444c; }
+.vehicle-art .bumper-highlight { fill: #9299a1; fill-opacity: .75; }
+.vehicle-art .panel-line {
+  fill: none;
+  stroke: #111821;
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+  stroke-opacity: .48;
+  vector-effect: non-scaling-stroke;
+}
+
 .vehicle-shape {
   --vehicle-color: #c7c8cb;
   position: relative;
@@ -355,13 +445,13 @@ h2 { margin-bottom: 8px; font-size: clamp(1.7rem, 7vw, 2.3rem); line-height: 1; 
   content: "";
 }
 
-.vehicle-shape.suv { height: 68px; border-radius: 24px 36px 15px 18px; }
-.vehicle-shape.suv::before { top: -19px; left: 22px; width: 82px; height: 33px; border-radius: 18px 24px 0 0; }
-.vehicle-shape.truck { width: 132px; border-radius: 20px 6px 14px 18px; }
-.vehicle-shape.truck::before { top: -23px; left: 7px; width: 56px; height: 36px; border-radius: 16px 22px 0 0; }
-.vehicle-shape.motorcycle { width: 78px; height: 19px; margin-top: 64px; border-radius: 18px; }
-.vehicle-shape.motorcycle::before { top: -28px; left: 24px; width: 36px; height: 30px; border-radius: 80% 10% 10%; }
-.vehicle-shape.motorcycle::after { right: -5px; bottom: -14px; box-shadow: -58px 0 0 -6px #a3a3a3, -58px 0 0 0 #39363b; }
+.vehicle-shape.SUV { height: 68px; border-radius: 24px 36px 15px 18px; }
+.vehicle-shape.SUV::before { top: -19px; left: 22px; width: 82px; height: 33px; border-radius: 18px 24px 0 0; }
+.vehicle-shape.Truck { width: 132px; border-radius: 20px 6px 14px 18px; }
+.vehicle-shape.Truck::before { top: -23px; left: 7px; width: 56px; height: 36px; border-radius: 16px 22px 0 0; }
+.vehicle-shape.Motorcycle { width: 78px; height: 19px; margin-top: 64px; border-radius: 18px; }
+.vehicle-shape.Motorcycle::before { top: -28px; left: 24px; width: 36px; height: 30px; border-radius: 80% 10% 10%; }
+.vehicle-shape.Motorcycle::after { right: -5px; bottom: -14px; box-shadow: -58px 0 0 -6px #a3a3a3, -58px 0 0 0 #39363b; }
 .sticky-footer { position: sticky; bottom: 0; padding-top: 18px; background: linear-gradient(transparent, var(--paper) 28%); }
 
 .color-preview {
@@ -376,6 +466,10 @@ h2 { margin-bottom: 8px; font-size: clamp(1.7rem, 7vw, 2.3rem); line-height: 1; 
 }
 
 .color-preview .vehicle-shape { transform: scale(1.22); }
+/* Step-2 SUV: once the GLB is showing, drop the flat icon's scale (it would
+   upsample the WebGL canvas) and give the viewer the whole preview card. */
+.color-preview .vehicle-model-host--preview.model-ready { transform: none; }
+.color-preview .vehicle-model-host--preview .vehicle-model { top: -72px; width: 270px; height: 180px; }
 .swatch-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; margin: 20px 0 30px; }
 .swatch {
   aspect-ratio: 1;
@@ -524,6 +618,26 @@ h2 { margin-bottom: 8px; font-size: clamp(1.7rem, 7vw, 2.3rem); line-height: 1; 
 .zone-label { position: absolute; z-index: 2; top: 5px; left: 7px; font-size: .66rem; font-weight: 900; }
 .stall { position: relative; min-width: 0; border: 1px solid rgb(109 103 113 / 45%); background: rgb(255 255 255 / 28%); }
 .zone.stalls-active .stall { border: 2px solid var(--blue); background: rgb(255 255 255 / 58%); }
+.zone.stalls-active .stall::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  min-width: 22px;
+  min-height: 22px;
+  padding: 2px;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  color: var(--blue-dark);
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 2px 7px rgb(22 72 108 / 18%);
+  content: attr(data-stall);
+  font-size: .68rem;
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+}
 .stall.selected { border-color: var(--blue-dark) !important; background: var(--blue-dark) !important; box-shadow: inset 0 0 0 2px white; }
 
 .floating-save {
