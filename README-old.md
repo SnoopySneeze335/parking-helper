@@ -1,6 +1,6 @@
 # Parking Helper navigation prototype
 
-Open `index.html` directly in a modern browser. The prototype uses plain HTML, CSS, and JavaScript and makes no network requests.
+The prototype uses plain HTML, CSS, and JavaScript and makes no runtime requests to third-party services. Open `index.html` directly for a flat-art fallback preview, or serve the repository from a local HTTP server to load the self-hosted SUV model and exercise offline caching.
 
 ## Preview modes
 
@@ -13,12 +13,14 @@ Data is intentionally held in memory only. Refreshing the page resets vehicle ch
 ## Implemented flow
 
 - First-launch warning, vehicle type selection, seven-color selection, and setup completion.
+- Self-hosted, static GLB presentation in the step-1 SUV card, with the prior flat SUV icon retained as a load/WebGL fallback. Step 2 remains flat artwork.
 - Main welcome screen with a CSS-only spinning garage placeholder.
-- Level, zone, and optional stall selection with save confirmation.
+- Level, zone, and optional numbered-stall selection with save confirmation.
 - Latest-location retrieval, including a zone-only display when no stall was selected.
 - Past-location split view with selection previews and retrieval handoff.
 - Settings sheet with vehicle-change routing and an About placeholder.
 - Back navigation and responsive phone/desktop layouts.
+- Service-worker caching of the app shell, model-viewer library, and SUV model after the first same-origin load.
 
 ## Assumptions made
 
