@@ -1,4 +1,10 @@
 import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
+import {
+  clear as clearSavedSpot,
+  getDebugInfo as getSavedSpotDebugInfo,
+  load as loadSavedSpot,
+  save as saveSavedSpot,
+} from "./storage.js";
 
 (() => {
   "use strict";
@@ -8,6 +14,43 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
     firstTime: params.get("firstTime") !== "0",
     emptyHistory: params.get("history") === "empty",
   };
+  const defaultScreen = flags.firstTime ? "warning" : "welcome";
+
+  function normalizeStoredSpot(value) {
+    if (!value || !Number.isInteger(value.level) || value.level < 1) return null;
+    if (typeof value.zone !== "string" || !/^F\d+-Z\d+$/.test(value.zone)) return null;
+    if (!value.zone.startsWith(`F${value.level}-`)) return null;
+    if (typeof value.savedAt !== "string" || Number.isNaN(Date.parse(value.savedAt))) return null;
+    if (value.stallId !== null && value.stallId !== undefined
+      && (typeof value.stallId !== "string" || !/^F\d+-Z\d+-S\d+$/.test(value.stallId))) return null;
+    if (value.stallId && !value.stallId.startsWith(`${value.zone}-S`)) return null;
+    const vehicleTypes = ["Sedan", "SUV", "Truck", "Motorcycle"];
+    const vehicleColorNames = ["black", "silver", "grey", "white", "blue", "red", "pink"];
+    return {
+      ...value,
+      stallId: value.stallId || null,
+      vehicle: {
+        type: vehicleTypes.includes(value.vehicle?.type) ? value.vehicle.type : "Sedan",
+        color: vehicleColorNames.includes(value.vehicle?.color) ? value.vehicle.color : "red",
+      },
+    };
+  }
+
+  function stallNumberFromId(stallId) {
+    const match = /-S(\d+)$/.exec(stallId || "");
+    return match ? Number(match[1]) : null;
+  }
+
+  function historyRecordFromStoredSpot(savedSpot) {
+    return {
+      id: `saved-${savedSpot.savedAt}`,
+      relative: "Saved spot",
+      date: new Date(savedSpot.savedAt).toLocaleDateString(),
+      level: savedSpot.level,
+      zone: savedSpot.zone,
+      stall: stallNumberFromId(savedSpot.stallId),
+    };
+  }
 
   const demoHistory = flags.emptyHistory
     ? []
@@ -16,18 +59,21 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
         // { id: "r4-l4-d-zone", relative: null, date: "8/24/26", level: 4, zone: "D", stall: null },
         // { id: "r4-l1-a-2", relative: null, date: "7/18/26", level: 1, zone: "A", stall: 2 },
       ];
+  const restoredSpot = normalizeStoredSpot(loadSavedSpot());
+  const restoredRecord = restoredSpot ? historyRecordFromStoredSpot(restoredSpot) : null;
 
   const state = {
-    screen: flags.firstTime ? "warning" : "welcome",
+    screen: restoredSpot ? "retrieval" : defaultScreen,
     stack: [],
-    selectedVehicle: "Sedan",
-    selectedColor: "red",
+    selectedVehicle: restoredSpot?.vehicle.type || "Sedan",
+    selectedColor: restoredSpot?.vehicle.color || "red",
     selectedLevel: null,
     selectedZone: null,
     selectedStall: null,
-    history: demoHistory,
+    history: restoredRecord ? [restoredRecord, ...demoHistory] : demoHistory,
     activeHistoryId: null,
-    retrievalId: null,
+    retrievalId: restoredRecord?.id || null,
+    savedSpot: restoredSpot,
   };
 
   const vehicleColors = {
@@ -413,6 +459,128 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
     return label;
   }
 
+  function canonicalZoneId(level, zone) {
+    if (/^F\d+-Z\d+$/.test(zone || "")) return zone;
+    if (/^[A-Z]$/.test(zone || "")) {
+      return `F${level}-Z${String(zone.charCodeAt(0) - 64).padStart(2, "0")}`;
+    }
+    return null;
+  }
+
+  function selectedStallId(zoneId, stallNumber) {
+    if (!zoneId || !stallNumber) return null;
+    return `${zoneId}-S${String(stallNumber).padStart(3, "0")}`;
+  }
+
+  function writeSavedSpot(savedSpot) {
+    const stored = saveSavedSpot({
+      level: savedSpot.level,
+      zone: savedSpot.zone,
+      stallId: savedSpot.stallId || null,
+      savedAt: savedSpot.savedAt,
+      vehicle: {
+        type: state.selectedVehicle,
+        color: state.selectedColor,
+      },
+    });
+    state.savedSpot = stored;
+    return stored;
+  }
+
+  function syncSavedHistory(savedSpot) {
+    const record = historyRecordFromStoredSpot(savedSpot);
+    const existingIndex = state.history.findIndex((item) => item.id === record.id);
+    if (existingIndex >= 0) state.history[existingIndex] = record;
+    else state.history.unshift(record);
+    state.retrievalId = record.id;
+    return record;
+  }
+
+  function persistSelectedLocation() {
+    const zone = canonicalZoneId(state.selectedLevel, state.selectedZone);
+    if (!zone) return null;
+    const stored = writeSavedSpot({
+      level: state.selectedLevel,
+      zone,
+      stallId: selectedStallId(zone, state.selectedStall),
+      savedAt: new Date().toISOString(),
+    });
+    syncSavedHistory(stored);
+    return stored;
+  }
+
+  function persistVehicleAppearance() {
+    if (!state.savedSpot) return;
+    writeSavedSpot(state.savedSpot);
+  }
+
+  function persistStallRefinement() {
+    if (!state.savedSpot) return;
+    const zone = canonicalZoneId(state.selectedLevel, state.selectedZone);
+    if (state.savedSpot.level !== state.selectedLevel || state.savedSpot.zone !== zone) return;
+    const stored = writeSavedSpot({
+      ...state.savedSpot,
+      stallId: selectedStallId(zone, state.selectedStall),
+    });
+    syncSavedHistory(stored);
+  }
+
+  function resetSavedState() {
+    clearSavedSpot();
+    state.screen = defaultScreen;
+    state.stack = [];
+    state.selectedVehicle = "Sedan";
+    state.selectedColor = "red";
+    state.selectedLevel = null;
+    state.selectedZone = null;
+    state.selectedStall = null;
+    state.history = [...demoHistory];
+    state.activeHistoryId = null;
+    state.retrievalId = null;
+    state.savedSpot = null;
+    render();
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function debugDump() {
+    const info = getSavedSpotDebugInfo();
+    return [
+      `localStorage available: ${info.available ? "yes" : "no"}`,
+      `Key: ${info.key}`,
+      `Size: ${info.sizeBytes} bytes`,
+      `Last successful write: ${info.lastSuccessfulWriteAt || "none"}`,
+      "Stored value:",
+      info.prettyValue,
+    ].join("\n");
+  }
+
+  async function copyDebugDump() {
+    const dump = debugDump();
+    try {
+      await navigator.clipboard.writeText(dump);
+      showToast("Debug info copied.");
+    } catch (error) {
+      console.warn("[Parking Helper] Clipboard copy failed.", error);
+      const textArea = document.createElement("textarea");
+      textArea.value = dump;
+      textArea.style.position = "fixed";
+      textArea.style.opacity = "0";
+      document.body.append(textArea);
+      textArea.select();
+      const copied = document.execCommand("copy");
+      textArea.remove();
+      showToast(copied ? "Debug info copied." : "Could not copy debug info.");
+    }
+  }
+
   function polygonCenter(vertices) {
     let twiceArea = 0;
     let centerX = 0;
@@ -595,6 +763,7 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
 
   function garagePlan({ interactive = false, selectedZone = null, selectedStall = null, parkedLocation = null, preview = false } = {}) {
     const zones = ["A", "B", "C", "D"];
+    const parkedZone = zoneFriendlyLabel(parkedLocation?.zone);
     return `
       <div class="garage-plan${preview ? " preview" : ""}" aria-label="Parking garage floor plan placeholder">
         <div class="structure elevator">lift</div>
@@ -615,10 +784,10 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
               </button>`).join("")
           : ""}
         ${parkedLocation && parkedLocation.stall
-          ? `<div class="parked-car" style="${carPosition(parkedLocation.zone, parkedLocation.stall)}; --vehicle-color: ${vehicleColors[state.selectedColor]}" aria-label="Your ${state.selectedColor} ${state.selectedVehicle}"></div>`
+          ? `<div class="parked-car" style="${carPosition(parkedZone, parkedLocation.stall)}; --vehicle-color: ${vehicleColors[state.selectedColor]}" aria-label="Your ${state.selectedColor} ${state.selectedVehicle}"></div>`
           : ""}
         ${parkedLocation && !parkedLocation.stall
-          ? `<div class="zone-focus" data-zone="${parkedLocation.zone}" aria-label="Saved zone ${parkedLocation.zone}"></div>`
+          ? `<div class="zone-focus" data-zone="${parkedZone}" aria-label="Saved zone ${parkedZone}"></div>`
           : ""}
       </div>`;
   }
@@ -900,6 +1069,27 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
       </div>`;
   }
 
+  function renderDebug() {
+    const info = getSavedSpotDebugInfo();
+    return `
+      <div class="screen-light debug-layout">
+        <p class="eyebrow dark">Developer tools</p>
+        <h1>Debug info</h1>
+        <dl class="debug-facts">
+          <div><dt>localStorage available</dt><dd>${info.available ? "Yes" : "No"}</dd></div>
+          <div><dt>Key</dt><dd><code>${escapeHtml(info.key)}</code></dd></div>
+          <div><dt>Size</dt><dd>${info.sizeBytes} bytes</dd></div>
+          <div><dt>Last successful write</dt><dd>${escapeHtml(info.lastSuccessfulWriteAt || "None")}</dd></div>
+        </dl>
+        <h2>Stored value</h2>
+        <pre class="debug-value">${escapeHtml(info.prettyValue)}</pre>
+        <div class="debug-actions">
+          <button class="secondary-button full" type="button" data-action="copy-debug">Copy to clipboard</button>
+          <button class="secondary-button danger full" type="button" data-action="clear-saved-data">Clear saved data</button>
+        </div>
+      </div>`;
+  }
+
   function initializeGaragePan() {
     const svg = screen.querySelector('[data-render-mode="zone-detail"]');
     if (!svg) return;
@@ -986,6 +1176,7 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
       retrieval: renderRetrieval,
       history: renderHistory,
       about: renderAbout,
+      debug: renderDebug,
     };
 
     screen.innerHTML = renderers[state.screen]();
@@ -1020,6 +1211,7 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
     }
 
     state.selectedStall = Number(stallElement.dataset.stall);
+    persistStallRefinement();
     const camera = screen.querySelector(".garage-registry-plan")?.getAttribute("viewBox");
     render();
     if (camera) screen.querySelector(".garage-registry-plan")?.setAttribute("viewBox", camera);
@@ -1086,18 +1278,11 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
           navigate("history");
         },
         "save-location": () => {
-          const id = `prototype-${Date.now()}`;
-          state.history.unshift({
-            id,
-            relative: "Just now",
-            date: "9/2/26",
-            level: state.selectedLevel,
-            zone: state.selectedZone,
-            stall: state.selectedStall,
-          });
-          state.retrievalId = id;
+          persistSelectedLocation();
           navigate("confirmation");
         },
+        "copy-debug": copyDebugDump,
+        "clear-saved-data": resetSavedState,
         home: goHome,
       };
       actions[target.dataset.action]?.();
@@ -1112,12 +1297,14 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
 
     if (target.dataset.vehicle) {
       state.selectedVehicle = target.dataset.vehicle;
+      persistVehicleAppearance();
       render();
       return;
     }
 
     if (target.dataset.color) {
       state.selectedColor = target.dataset.color;
+      persistVehicleAppearance();
       if (!applyColorInPlace()) render();
       return;
     }
@@ -1192,6 +1379,10 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
       closeSettings();
       navigate("about");
     }
+    if (action === "debug") {
+      closeSettings();
+      navigate("debug");
+    }
   });
 
   document.addEventListener("keydown", (event) => {
@@ -1199,6 +1390,10 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
   });
 
   window.addEventListener("popstate", () => showToast("Use the in-app back arrow in this prototype."));
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") persistVehicleAppearance();
+  });
+  window.addEventListener("pagehide", persistVehicleAppearance);
   if ("serviceWorker" in navigator && /^https?:$/.test(window.location.protocol)) {
     window.addEventListener(
       "load",

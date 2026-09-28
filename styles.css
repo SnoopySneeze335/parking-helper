@@ -894,6 +894,15 @@ h2 { margin-bottom: 8px; font-size: clamp(1.7rem, 7vw, 2.3rem); line-height: 1; 
 .empty-layout .primary-button { width: min(100%, 320px); margin-top: 26px; }
 .about-layout { justify-content: center; }
 .about-card { padding: 30px 24px; border: 1px solid #e2dae4; border-radius: 28px; background: white; box-shadow: 0 16px 44px rgb(47 22 51 / 8%); }
+.debug-layout { min-height: 100dvh; overflow-wrap: anywhere; }
+.debug-layout h2 { margin: 26px 0 10px; font-size: 1rem; }
+.debug-facts { display: grid; gap: 8px; margin: 24px 0 0; }
+.debug-facts div { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid #e2dae4; border-radius: 12px; background: white; }
+.debug-facts dt { color: #746c76; font-size: .72rem; font-weight: 800; text-transform: uppercase; }
+.debug-facts dd { margin: 0; font-size: .86rem; }
+.debug-value { max-height: 300px; margin: 0; padding: 14px; overflow: auto; border: 1px solid #d8d0db; border-radius: 12px; background: #fff; font: .75rem/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace; white-space: pre-wrap; }
+.debug-actions { display: grid; gap: 10px; margin-top: 18px; }
+.secondary-button.danger { color: #9a2232; border-color: #e7b9c0; background: #fff7f8; }
 .placeholder-lines { display: grid; gap: 10px; margin: 28px 0 10px; }
 .placeholder-lines span { height: 9px; border-radius: 99px; background: #e8e1ea; }
 .placeholder-lines span:nth-child(2) { width: 84%; }

@@ -1,10 +1,11 @@
 # AGENTS.md
 
-Last updated: 2026-09-18
+Last updated: 2026-09-28
 
 ## Scope
 
 These instructions apply to the entire Parking Helper repository. Keep this file current after meaningful implementation, deployment, or product-planning changes.
+Update this file after every user instruction/session, even when the change is small. Record durable behavior, architecture, validation requirements, and handoff context rather than a raw transcript.
 
 ## Project mission
 
@@ -30,7 +31,7 @@ Plan.md, prompt.txt, and STORAGE_DESIGN.md are currently local-only and ignored 
 - Current production code is plain HTML, CSS, and JavaScript with no build tool or framework.
 - The current prototype must not make runtime network requests or depend on CDNs. Third-party browser libraries must be pinned, self-hosted, and retain their license/provenance files.
 - User data must remain on the device. No accounts, server storage, cookies, or remote telemetry.
-- When persistence is implemented, all localStorage access must live in one dedicated module. UI code must never access localStorage directly.
+- All localStorage access lives in storage.js. UI code must never access localStorage directly.
 - Preserve usable fallback screens when no parking location or history exists.
 - Preserve reduced-motion support and keyboard/focus behavior.
 - Treat the real garage geometry, floor layouts, zone definitions, stalls, vehicle models, and About copy as pending assets/content unless a task supplies them.
@@ -41,6 +42,7 @@ Plan.md, prompt.txt, and STORAGE_DESIGN.md are currently local-only and ignored 
 | --- | --- |
 | index.html | Static app shell, header, settings sheet, toast container, and app script entry point. |
 | app.js | Current single-page navigation, in-memory state, reusable garage SVG renderer, SUV viewer fallback wiring, and event handling. |
+| storage.js | Sole owner of the saved-spot localStorage key, JSON parsing, writes, clearing, diagnostics, and in-memory failure fallback. |
 | styles.css | Responsive mobile UI, garage/vehicle artwork and fallbacks, animations, and interaction states. |
 | service-worker.js | Offline cache for the app shell, bundled garage registries, self-hosted model-viewer bundle, and SUV GLB. |
 | data/garage/floor-2.json through floor-5.json | Validated AutoCAD-derived floor registries with zones, stalls, and structural features. |
@@ -63,7 +65,9 @@ Plan.md, prompt.txt, and STORAGE_DESIGN.md are currently local-only and ignored 
 
 - The app is an IIFE-based single-page interface; screens are rendered into the #screen element.
 - First-time and returning-user branches are currently simulated with query parameters.
-- Parking data and vehicle selection currently live only in memory and reset on refresh.
+- Parking history, onboarding, and unsaved selections remain in memory and reset on refresh.
+- The current saved spot persists under `parkingHelper.savedSpot`, including canonical level/zone/stall IDs, `savedAt`, last-write time, and vehicle type/color. A valid record boots directly into retrieval before the first render; invalid or inaccessible storage falls back without crashing.
+- Settings includes a plain Debug info screen with storage availability, key, byte size, formatted raw value, last successful write, clipboard copy, and clear-data controls.
 - Returning-user demo mode contains sample parking history unless the empty-history flag is used.
 - Vehicle choices are sedan, SUV, truck, and motorcycle.
 - Vehicle colors are black, silver, grey, white, blue, red, and pink.
@@ -73,7 +77,7 @@ Plan.md, prompt.txt, and STORAGE_DESIGN.md are currently local-only and ignored 
 - A swatch tap on the SUV preview updates the DOM in place (`applyColorInPlace`) instead of rebuilding the screen, so the model is not destroyed and re-downloaded per tap. All other vehicles still take the full `render()` path. State and navigation are unchanged.
 - All SUV presentation values (camera orbit, field of view, camera target, exposure, shadows, environment) live in the `SUV_MODEL` constant at the top of app.js and apply at runtime in the browser. Geometry, scale, material names, and non-body colours require a Blender re-export.
 - A service worker precaches the app shell, model-viewer bundle, model manifest, and the versioned SUV GLB URL for same-origin offline use. Its cache name includes the manifest version, so a re-export produces a new cache and the old one is deleted on activate.
-- Garage levels are 1-6. Levels 2-5 use the AutoCAD-derived feature and zone geometry for the initial zone overview, with full zone IDs presented as friendly letters A-R. The overview rotates into a vertically scrolling plan on portrait phones.
+- Garage levels are 1-6. Levels 2-5 use the AutoCAD-derived feature and zone geometry for the initial zone overview, with full zone IDs presented as friendly letters A-R.
 - Levels 2-5 use a vertical SVG plan within the app column at every browser width. Selecting a zone animates its viewBox to the zone and reveals registry-sized stall hitboxes with upright numbers. Drag, wheel/trackpad, and arrow-key panning preserve all structural landmarks and show neighboring stalls faded; Recenter zone restores the initial view. Selecting a stall preserves the panned view. Back clears the selection and restores the overview scroll position before returning to level selection on the next Back. Levels 1 and 6 retain placeholder geometry.
 - The validated floor registries are compiled into data/garage/registry-bundle.js and imported with app.js, so the app makes no runtime JSON request. Rerun `node garage-plans-tools/bundle_garage_registries.mjs` after registry changes.
 - The save flow supports floor, zone, and optional stall selection.
@@ -105,22 +109,13 @@ These flags are prototype controls, not the final source of onboarding or histor
 - The GLB must never be scaled to fit a card; framing is done with camera distance / field of view only, so relative vehicle sizes stay true for a future top-down view.
 - The GLB URL must come from `window.PARKING_HELPER_MODELS` (the generated manifest) with `assets/models/suv.glb` as the fallback; never hardcode a versioned URL.
 
-## Local persistence plan
+## Local persistence
 
-Persistence is designed but not implemented.
-
-The next implementation should follow these rules:
-
-- Add one dedicated **storage.js** module.
-- Use a single versioned JSON document under a stable localStorage key.
-- Persist current location, at most 100 newest-first history entries, vehicle selection, onboarding completion, and the one-time home-screen nudge flag.
-- Canonical IDs are **F1-Z01** for zone-only and **F1-Z01-S001** for stall-specific saves.
-- Store zone-only saves with stall set to null.
-- Validate all inputs before writes.
-- Migrate older schema versions sequentially.
-- Handle unavailable storage, quota exhaustion, invalid input, and corrupt data without crashing or claiming that a session-only save is durable.
-- Keep the default vehicle as a red sedan.
-- Consult STORAGE_DESIGN.md for the proposed API, data schema, migration lifecycle, failure messages, and unresolved decisions.
+- storage.js exposes load, save, clear, and read-only diagnostics for one `parkingHelper.savedSpot` JSON object.
+- The record contains level, canonical zone ID, nullable canonical stall ID, `savedAt`, `lastWriteAt`, and vehicle type/color.
+- Saves happen synchronously when Save Zone/Spot is used, when an existing saved zone is refined to a stall, on vehicle type/color changes, when the document becomes hidden, and on pagehide. Clearing removes the key.
+- Every localStorage operation is guarded; failures are logged and use process-memory fallback state. Invalid and malformed records boot as no saved spot.
+- This implementation intentionally does not persist history, onboarding, settings without a saved spot, or other state. Schema migrations, expiry, and staleness remain future work. Consult STORAGE_DESIGN.md before expanding the scope.
 
 ## Run and verify
 
@@ -163,7 +158,7 @@ Then manually exercise:
 5. If a stale model ever sticks: DevTools > Application > Service Workers > Unregister, then reload. During long tuning sessions, tick "Update on reload" and "Bypass for network" on that panel.
 6. Presentation-only tweaks (values in `SUV_MODEL` in app.js) need no export: save app.js and refresh.
 
-After persistence is implemented, also test refresh/reload, 101 saves and pruning, invalid IDs, corrupted JSON, unavailable localStorage, quota errors, schema migration, and repeat visits to the same location.
+For saved-spot persistence changes, also test direct retrieval after reload, zone-only and stall-specific records, vehicle changes, clear-and-reload, invalid JSON, unavailable localStorage, clipboard diagnostics, visibilitychange, and pagehide.
 
 ## Cloudflare Pages
 
@@ -175,7 +170,7 @@ The repository itself is the deployable output; index.html is at the root.
 - Build command: exit 0
 - Build output directory: .
 
-A Pages deployment tests static hosting and real-device access. The current service worker caches the app shell and SUV viewer assets after a successful first load, but local persistence is still not implemented, so parking data does not survive a refresh.
+A Pages deployment tests static hosting and real-device access. The current saved spot survives refreshes on the same origin; parking history and other app state remain session-only.
 
 localStorage is origin-scoped. Data saved on a pages.dev preview address will not transfer automatically to a later custom domain, so choose the permanent production origin before real user testing.
 
@@ -195,7 +190,7 @@ localStorage is origin-scoped. Data saved on a pages.dev preview address will no
 ### P0 — Persistence and real-world test readiness
 
 - [ ] Resolve the open storage-model questions below.
-- [ ] Implement storage.js from STORAGE_DESIGN.md.
+- [x] Persist the current saved spot and vehicle appearance through storage.js with guarded localStorage access and diagnostics.
 - [ ] Replace demo/query-based production state with initialized stored state while retaining an intentional developer preview mode if useful.
 - [ ] Add visible durable/session-only/error messaging.
 - [ ] Add storage validation and migration tests.
@@ -231,6 +226,8 @@ localStorage is origin-scoped. Data saved on a pages.dev preview address will no
 
 ## Completed work log
 
+- **2026-09-28:** Added guarded single-record saved-spot persistence in storage.js, direct-to-retrieval boot restoration, synchronous location/vehicle/lifecycle writes, a settings Debug info screen, clipboard dump, and clear-data reset. History, migrations, expiry, and broader preference persistence remain out of scope.
+
 - **2026-09-28:** Added bounded detail-map panning with faded neighboring stalls and full landmarks, drag-versus-tap handling, and recentering. Retrieval now uses the full registry overview with the selected vehicle at its saved stall and a zone-only fallback.
 
 - **2026-09-28:** Made the registry plan vertical regardless of outer browser orientation; added animated zone focus, accurate registry stall hitboxes and upright numbers, keyboard selection, reduced-motion handling, and Back-to-overview with restored scrolling.
@@ -251,7 +248,7 @@ localStorage is origin-scoped. Data saved on a pages.dev preview address will no
 
 ## Updating this file
 
-After meaningful work:
+After every user instruction/session:
 
 1. Check off completed to-do items or move them into the dated completed-work log.
 2. Add newly discovered regressions, constraints, and open questions.
