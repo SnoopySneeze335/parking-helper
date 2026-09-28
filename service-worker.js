@@ -11,7 +11,9 @@ try {
 }
 const MODELS = self.PARKING_HELPER_MODELS || FALLBACK_MODELS;
 
-const CACHE_NAME = `parking-helper-shell-v5-${MODELS.version}`;
+// Bump this generation whenever a deployed app-shell file changes. The worker
+// is cache-first, so changing the generation is what retires stale releases.
+const CACHE_NAME = `parking-helper-shell-v6-${MODELS.version}`;
 const PRECACHE_URLS = [
   "./",
   "./index.html",

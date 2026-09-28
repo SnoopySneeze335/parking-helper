@@ -76,7 +76,7 @@ Plan.md, prompt.txt, and STORAGE_DESIGN.md are currently local-only and ignored 
 - Step-2 SUV tinting: on load, and on every swatch tap, app.js sets the base colour factor of the GLB material named `body dark purple` (constant `SUV_MODEL.bodyMaterial`) through model-viewer's material API. Swatch hexes come from the single `vehicleColors` table and are converted sRGB -> linear before being applied. No other material is touched.
 - A swatch tap on the SUV preview updates the DOM in place (`applyColorInPlace`) instead of rebuilding the screen, so the model is not destroyed and re-downloaded per tap. All other vehicles still take the full `render()` path. State and navigation are unchanged.
 - All SUV presentation values (camera orbit, field of view, camera target, exposure, shadows, environment) live in the `SUV_MODEL` constant at the top of app.js and apply at runtime in the browser. Geometry, scale, material names, and non-body colours require a Blender re-export.
-- A service worker precaches the app shell, model-viewer bundle, model manifest, and the versioned SUV GLB URL for same-origin offline use. Its cache name includes the manifest version, so a re-export produces a new cache and the old one is deleted on activate.
+- A service worker precaches the app shell, model-viewer bundle, model manifest, and the versioned SUV GLB URL for same-origin offline use. Its cache name includes both a manual shell generation and the manifest version. Bump the shell generation whenever deployed HTML, CSS, or JavaScript changes; a model re-export updates the manifest version automatically. Activation deletes older caches.
 - Garage levels are 1-6. Levels 2-5 use the AutoCAD-derived feature and zone geometry for the initial zone overview, with full zone IDs presented as friendly letters A-R.
 - Levels 2-5 use a vertical SVG plan within the app column at every browser width. Selecting a zone animates its viewBox to the zone and reveals registry-sized stall hitboxes with upright numbers. Drag, wheel/trackpad, and arrow-key panning preserve all structural landmarks and show neighboring stalls faded; Recenter zone restores the initial view. Selecting a stall preserves the panned view. Back clears the selection and restores the overview scroll position before returning to level selection on the next Back. Levels 1 and 6 retain placeholder geometry.
 - The validated floor registries are compiled into data/garage/registry-bundle.js and imported with app.js, so the app makes no runtime JSON request. Rerun `node garage-plans-tools/bundle_garage_registries.mjs` after registry changes.
@@ -172,6 +172,8 @@ The repository itself is the deployable output; index.html is at the root.
 
 A Pages deployment tests static hosting and real-device access. The current saved spot survives refreshes on the same origin; parking history and other app state remain session-only.
 
+Because the service worker uses cache-first app-shell responses, every shell release must also bump the manual cache generation in service-worker.js. Otherwise Cloudflare can deploy the new commit while returning users continue to see the previously cached interface.
+
 localStorage is origin-scoped. Data saved on a pages.dev preview address will not transfer automatically to a later custom domain, so choose the permanent production origin before real user testing.
 
 ## Git workflow
@@ -225,6 +227,8 @@ localStorage is origin-scoped. Data saved on a pages.dev preview address will no
 - Which custom domain will be the permanent localStorage origin?
 
 ## Completed work log
+
+- **2026-09-28:** Verified the persistence and Debug info implementation is committed, then bumped the existing service-worker shell generation so a Cloudflare deployment replaces the stale pre-persistence app cache.
 
 - **2026-09-28:** Added guarded single-record saved-spot persistence in storage.js, direct-to-retrieval boot restoration, synchronous location/vehicle/lifecycle writes, a settings Debug info screen, clipboard dump, and clear-data reset. History, migrations, expiry, and broader preference persistence remain out of scope.
 
