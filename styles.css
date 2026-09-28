@@ -564,7 +564,7 @@ h2 { margin-bottom: 8px; font-size: clamp(1.7rem, 7vw, 2.3rem); line-height: 1; 
 
 .garage-overview-scroll {
   width: 100%;
-  max-height: calc(100dvh - 278px - env(safe-area-inset-top));
+  height: calc(100dvh - 250px - env(safe-area-inset-top));
   min-height: 280px;
   overflow-x: hidden;
   overflow-y: auto;
@@ -627,8 +627,36 @@ h2 { margin-bottom: 8px; font-size: clamp(1.7rem, 7vw, 2.3rem); line-height: 1; 
   pointer-events: none;
 }
 
-.garage-zone-letter { font-size: 4.4px; }
-.garage-zone-count { font-size: 2.45px; letter-spacing: -.08px; }
+.garage-zone-letter { font-size: 6px; }
+.garage-zone-count { font-size: 3.1px; letter-spacing: -.08px; }
+
+.registry-detail .garage-overview-scroll { height: calc(100dvh - 370px - env(safe-area-inset-top)); overflow: hidden; }
+.registry-detail .garage-registry-plan { height: 100%; }
+.registry-detail .garage-registry-plan { touch-action: none; user-select: none; cursor: grab; }
+.registry-detail .garage-registry-plan.is-panning,
+.registry-detail .garage-registry-plan.is-panning * { cursor: grabbing; }
+.garage-context-zone { opacity: .2; }
+.garage-context-stall { opacity: .27; pointer-events: none; }
+.garage-context-stall polygon { fill: #f7f4f8; stroke: #527891; stroke-width: 1; }
+.garage-context-stall text { fill: #395b70; font-size: 3.8px; font-weight: 750; }
+.garage-recenter { display: block; margin: 5px auto 0; padding: 7px 12px; border-radius: 99px; color: var(--blue-dark); background: white; font-size: .75rem; }
+.garage-recenter:focus-visible { outline-color: var(--blue-dark); }
+.garage-zone-region.saved-zone .garage-zone-shape { fill: rgb(43 156 237 / 22%); stroke: var(--blue-dark); stroke-width: 2.5; }
+[data-render-mode="saved-location"] .garage-zone-region { cursor: default; }
+.garage-saved-vehicle { pointer-events: none; }
+.saved-vehicle-halo { fill: rgb(255 255 255 / 88%); stroke: var(--blue-dark); stroke-width: 2; }
+.garage-map-vehicle { width: 160px; height: 120px; transform: scale(.1); transform-origin: top left; display: grid; place-items: center; }
+.garage-map-vehicle > .vehicle-art { width: 150px; height: 110px; }
+.garage-map-vehicle > .vehicle-shape { margin: 10px 0 0; }
+.registry-retrieval .garage-overview-scroll { height: calc(100dvh - 345px); }
+.garage-stall-region { cursor: pointer; outline: none; }
+.garage-stall-region polygon { fill: #f7f4f8; stroke: var(--blue); stroke-width: 1.5; }
+.garage-stall-region text { fill: var(--blue-dark); font-size: 3.8px; font-weight: 850; pointer-events: none; }
+.garage-stall-region:hover polygon, .garage-stall-region:focus-visible polygon { fill: #d1eaff; stroke: var(--blue-dark); stroke-width: 3; }
+.garage-stall-region.selected polygon { fill: var(--blue-dark); stroke: white; stroke-width: 2; }
+.garage-stall-region.selected text { fill: white; }
+.is-zooming .garage-stall-layer { opacity: 0; pointer-events: none; }
+.garage-stall-layer { transition: opacity 160ms ease; }
 
 .registry-overview .garage-hint {
   position: static;
@@ -940,5 +968,6 @@ h2 { margin-bottom: 8px; font-size: clamp(1.7rem, 7vw, 2.3rem); line-height: 1; 
   .overlay { inset: 24px 0; border-radius: 34px; overflow: hidden; }
   .floating-save { bottom: 44px; }
   .history-layout { height: calc(100dvh - 120px - env(safe-area-inset-top)); }
-  .garage-overview-scroll { min-height: 0; max-height: none; overflow: visible; }
+  .garage-overview-scroll { height: calc(100dvh - 298px); }
+  .registry-detail .garage-overview-scroll { height: calc(100dvh - 418px); }
 }

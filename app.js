@@ -102,7 +102,7 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
     zoneDetail: "zone-detail",
     savedLocation: "saved-location",
   });
-  const portraitGarageQuery = window.matchMedia("(max-width: 699px) and (orientation: portrait)");
+  let overviewScrollTop = 0;
 
   const screen = document.querySelector("#screen");
   const app = document.querySelector("#app");
@@ -476,7 +476,16 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
     }).join("");
   }
 
-  function garageOverviewMarkup(registry, frame) {
+  function stallVertices(stall) {
+    return [
+      [stall.x - stall.width / 2, stall.y - stall.height / 2],
+      [stall.x + stall.width / 2, stall.y - stall.height / 2],
+      [stall.x + stall.width / 2, stall.y + stall.height / 2],
+      [stall.x - stall.width / 2, stall.y + stall.height / 2],
+    ];
+  }
+
+  function garageOverviewMarkup(registry, frame, selectedZone = null, highlightedStall = null, savedLocation = null) {
     const featureOrder = ["deck", "wall", "ramp", "vertical", "marking", "column"];
     const features = featureOrder.map((featureName) => garageFeatureMarkup(
       featureName,
@@ -485,11 +494,16 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
     )).join("");
 
     const zones = registry.zones.map((zone) => {
+      if (selectedZone) {
+        return `<polygon class="garage-zone-shape${zone.id !== selectedZone ? " garage-context-zone" : ""}" points="${svgPoints(zone.boundary, frame)}"
+          vector-effect="non-scaling-stroke" aria-hidden="true"></polygon>`;
+      }
       const label = zoneFriendlyLabel(zone.id);
       const [labelX, labelY] = frame.point(polygonCenter(zone.boundary));
       const stallLabel = `${zone.stall_count} ${zone.stall_count === 1 ? "stall" : "stalls"}`;
       return `
-        <a class="garage-zone-region" href="#" data-zone="${zone.id}" role="button"
+        <${savedLocation ? "g" : "a"} class="garage-zone-region${savedLocation?.zone === zone.id ? " saved-zone" : ""}"
+          ${savedLocation ? `data-saved-zone="${zone.id}"` : `href="#" data-zone="${zone.id}" role="button"`}
           aria-label="Zone ${label}, ${stallLabel}">
           <polygon class="garage-zone-shape" points="${svgPoints(zone.boundary, frame)}"
             vector-effect="non-scaling-stroke"></polygon>
@@ -498,34 +512,84 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
             <tspan class="garage-zone-letter" x="${labelX.toFixed(2)}" dy="-0.55">${label}</tspan>
             <tspan class="garage-zone-count" x="${labelX.toFixed(2)}" dy="3.35">${stallLabel}</tspan>
           </text>
-        </a>`;
+        </${savedLocation ? "g" : "a"}>`;
     }).join("");
 
+    const stalls = selectedZone ? registry.stalls.map((stall) => {
+      const number = Number(stall.id.split("-S")[1]);
+      const [x, y] = frame.point([stall.x, stall.y]);
+      if (stall.zone !== selectedZone) {
+        return `<g class="garage-context-stall" aria-hidden="true">
+          <polygon points="${svgPoints(stallVertices(stall), frame)}" vector-effect="non-scaling-stroke"></polygon>
+          <text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central">${number}</text>
+        </g>`;
+      }
+      return `<a class="garage-stall-region${highlightedStall === number ? " selected" : ""}"
+        href="#" role="button" data-zone="${stall.zone}" data-stall="${number}" data-stall-id="${stall.id}"
+        aria-label="Stall ${number}, Zone ${zoneFriendlyLabel(stall.zone)}" aria-pressed="${highlightedStall === number}">
+        <polygon points="${svgPoints(stallVertices(stall), frame)}" vector-effect="non-scaling-stroke"></polygon>
+        <text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" aria-hidden="true">${number}</text>
+      </a>`;
+    }).join("") : "";
     return `<g class="garage-feature-layer" aria-hidden="true">${features}</g>
-      <g class="garage-zone-layer" aria-label="Parking zones">${zones}</g>`;
+      <g class="garage-zone-layer" aria-label="Parking zones">${zones}</g>
+      <g class="garage-stall-layer" aria-label="Parking stalls">${stalls}</g>`;
+  }
+
+  function savedVehicleMarkup(registry, frame, location) {
+    if (!location?.stall) return "";
+    const stall = registry.stalls.find((item) => item.zone === location.zone
+      && (item.id === location.stall || Number(item.id.split("-S")[1]) === Number(location.stall)));
+    if (!stall) return "";
+    const [x, y] = frame.point([stall.x, stall.y]);
+    const color = vehicleColors[state.selectedColor];
+    const vehicle = state.selectedVehicle === "SUV"
+      ? suvShape(color, { tint: color }) : vehicleShape(state.selectedVehicle, color);
+    return `<g class="garage-saved-vehicle" data-saved-stall="${stall.id}" role="img"
+      aria-label="Your ${state.selectedColor} ${state.selectedVehicle}, Zone ${zoneFriendlyLabel(stall.zone)}, stall ${Number(stall.id.split("-S")[1])}">
+      <circle cx="${x}" cy="${y}" r="6" class="saved-vehicle-halo" vector-effect="non-scaling-stroke"></circle>
+      <foreignObject x="${x - 8}" y="${y - 6}" width="16" height="12">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="garage-map-vehicle">${vehicle}</div>
+      </foreignObject>
+    </g>`;
   }
 
   function garageRegistryRenderer(
     registry,
-    { mode = GARAGE_RENDER_MODES.overview, highlightedStall = null } = {},
+    { mode = GARAGE_RENDER_MODES.overview, selectedZone = null, highlightedStall = null, savedLocation = null } = {},
   ) {
-    if (mode !== GARAGE_RENDER_MODES.overview) {
+    if (!Object.values(GARAGE_RENDER_MODES).includes(mode)) {
       throw new Error(`Garage renderer mode ${mode} is not implemented yet.`);
     }
 
-    const portrait = portraitGarageQuery.matches;
+    // The app stays phone-width even in a wide desktop browser window.
+    const portrait = true;
     const frame = garageCoordinateFrame(registry.bounds, portrait);
+    let viewBox = [0, 0, frame.width, frame.height];
+    if (mode === GARAGE_RENDER_MODES.zoneDetail) {
+      const zone = registry.zones.find((item) => item.id === selectedZone);
+      const vertices = [...zone.boundary, ...registry.stalls
+        .filter((stall) => stall.zone === selectedZone).flatMap(stallVertices)];
+      const points = vertices.map((point) => frame.point(point));
+      const minX = Math.min(...points.map((point) => point[0]));
+      const minY = Math.min(...points.map((point) => point[1]));
+      const maxX = Math.max(...points.map((point) => point[0]));
+      const maxY = Math.max(...points.map((point) => point[1]));
+      viewBox = [minX - 3, minY - 3, maxX - minX + 6, maxY - minY + 6];
+    }
     const highlightedStallAttribute = highlightedStall
       ? ` data-highlighted-stall="${highlightedStall}"`
       : "";
 
     return `
       <svg class="garage-registry-plan garage-registry-plan--${portrait ? "portrait" : "landscape"}"
-        viewBox="0 0 ${frame.width.toFixed(2)} ${frame.height.toFixed(2)}"
+        viewBox="${viewBox.join(" ")}" data-target-viewbox="${viewBox.join(" ")}"
         preserveAspectRatio="xMidYMid meet" role="group" aria-labelledby="garage-plan-title"
-        data-render-mode="${mode}"${highlightedStallAttribute}>
-        <title id="garage-plan-title">Level ${registry.floor.slice(1)} garage zone overview</title>
-        ${garageOverviewMarkup(registry, frame)}
+        data-render-mode="${mode}" data-plan-width="${frame.width}" data-plan-height="${frame.height}"
+        ${mode === GARAGE_RENDER_MODES.zoneDetail ? 'tabindex="0" aria-description="Drag, scroll, or use arrow keys to explore the garage."' : ""}${highlightedStallAttribute}>
+        <title id="garage-plan-title">Level ${registry.floor.slice(1)} ${selectedZone ? `Zone ${zoneFriendlyLabel(selectedZone)} stalls` : "garage zone overview"}</title>
+        ${garageOverviewMarkup(registry, frame, selectedZone, highlightedStall, savedLocation)}
+        ${savedVehicleMarkup(registry, frame, savedLocation)}
       </svg>`;
   }
 
@@ -566,6 +630,14 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
   }
 
   function goBack() {
+    if (state.screen === "zone-selection" && state.selectedZone) {
+      state.selectedZone = null;
+      state.selectedStall = null;
+      render();
+      const scroller = screen.querySelector(".garage-overview-scroll");
+      if (scroller) scroller.scrollTop = overviewScrollTop;
+      return;
+    }
     const previous = state.stack.pop();
     if (!previous) return;
     state.screen = previous;
@@ -706,7 +778,7 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
     const hasZone = Boolean(state.selectedZone);
     const hasStall = Boolean(state.selectedStall);
     const registry = garageRegistryForLevel(state.selectedLevel);
-    const showRegistryOverview = Boolean(registry && !hasZone);
+    const showRegistryOverview = Boolean(registry);
     const friendlyZone = zoneFriendlyLabel(state.selectedZone);
     return `
       <div class="screen-garage">
@@ -715,11 +787,15 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
           <h1>${hasZone ? `Zone ${friendlyZone} selected` : "Choose a zone."}</h1>
           <p class="lede dark">${hasZone ? "Save the zone now, or tap an outlined stall for extra detail." : "Tap the blue area where you parked."}</p>
         </div>
-        <div class="garage-plan-wrap${showRegistryOverview ? " registry-overview" : ""}">
+        <div class="garage-plan-wrap${showRegistryOverview ? ` registry-overview${hasZone ? " registry-detail" : ""}` : ""}">
           ${showRegistryOverview
-            ? `<div class="garage-overview-scroll">${garageRegistryRenderer(registry, { mode: GARAGE_RENDER_MODES.overview })}</div>`
+            ? `<div class="garage-overview-scroll">${garageRegistryRenderer(registry, {
+              mode: hasZone ? GARAGE_RENDER_MODES.zoneDetail : GARAGE_RENDER_MODES.overview,
+              selectedZone: state.selectedZone, highlightedStall: state.selectedStall,
+            })}</div>`
             : garagePlan({ interactive: true, selectedZone: state.selectedZone, selectedStall: state.selectedStall })}
-          <div class="garage-hint">${hasZone ? (hasStall ? `Stall ${state.selectedStall} selected` : "Optional: choose a stall") : "Blue outlines are parking zones"}</div>
+          <div class="garage-hint">${hasZone ? (hasStall ? `Stall ${state.selectedStall} selected · Drag to explore` : "Drag to explore · Tap a stall") : "Blue outlines are parking zones"}</div>
+          ${hasZone && registry ? '<button class="garage-recenter" type="button" data-action="recenter-zone">Recenter zone</button>' : ""}
         </div>
         ${hasZone ? `<button class="primary-button blue floating-save" type="button" data-action="save-location">${hasStall ? "Save spot" : "Save zone"}</button>` : ""}
       </div>`;
@@ -747,16 +823,20 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
   function renderRetrieval() {
     const location = currentRetrieval();
     if (!location) return renderEmpty("No saved spots yet", "Save a parking location first, then it will appear here.");
+    const registry = garageRegistryForLevel(location.level);
+    const zoneLabel = zoneFriendlyLabel(location.zone);
     return `
       <div class="screen-garage retrieve-layout">
         <div class="screen-heading compact">
           <p class="eyebrow dark">Your saved location</p>
           <h1>You are parked on level ${location.level}.</h1>
-          <p class="lede dark">${location.stall ? `Zone ${location.zone}, stall ${location.stall}. Your vehicle is marked below.` : `Zone ${location.zone}. No individual stall was saved.`}</p>
+          <p class="lede dark">${location.stall ? `Zone ${zoneLabel}, stall ${location.stall}. Your vehicle is marked below.` : `Zone ${zoneLabel}. No individual stall was saved.`}</p>
         </div>
-        <div class="garage-plan-wrap">
-          ${garagePlan({ parkedLocation: location })}
-          <div class="garage-hint">${location.stall ? `Your ${state.selectedColor} ${state.selectedVehicle}` : `Saved zone ${location.zone}`}</div>
+        <div class="garage-plan-wrap${registry ? " registry-overview registry-retrieval" : ""}">
+          ${registry ? `<div class="garage-overview-scroll">${garageRegistryRenderer(registry, {
+            mode: GARAGE_RENDER_MODES.savedLocation, savedLocation: location,
+          })}</div>` : garagePlan({ parkedLocation: location })}
+          <div class="garage-hint">${location.stall ? `Your ${state.selectedColor} ${state.selectedVehicle}` : `Saved zone ${zoneLabel}`}</div>
         </div>
         <button class="primary-button dark" type="button" data-action="home">Back to menu</button>
       </div>`;
@@ -820,6 +900,73 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
       </div>`;
   }
 
+  function initializeGaragePan() {
+    const svg = screen.querySelector('[data-render-mode="zone-detail"]');
+    if (!svg) return;
+    let drag = null;
+    let suppressClickUntil = 0;
+
+    function moveCamera(dx, dy) {
+      const box = svg.viewBox.baseVal;
+      const scale = svg.getScreenCTM()?.a;
+      if (!scale) return;
+      // Include the extra visible area added by preserveAspectRatio="meet".
+      const visibleWidth = svg.clientWidth / scale;
+      const visibleHeight = svg.clientHeight / scale;
+      function clampCenter(center, visible, total) {
+        return visible >= total ? total / 2 : Math.max(visible / 2, Math.min(total - visible / 2, center));
+      }
+      const cx = clampCenter(box.x + box.width / 2 + dx / scale, visibleWidth, Number(svg.dataset.planWidth));
+      const cy = clampCenter(box.y + box.height / 2 + dy / scale, visibleHeight, Number(svg.dataset.planHeight));
+      svg.setAttribute("viewBox", [cx - box.width / 2, cy - box.height / 2, box.width, box.height].join(" "));
+    }
+
+    svg.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 || !event.isPrimary || svg.classList.contains("is-zooming")) return;
+      drag = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+    });
+    svg.addEventListener("pointermove", (event) => {
+      if (!drag || drag.id !== event.pointerId) return;
+      const dx = event.clientX - drag.x;
+      const dy = event.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+      drag.moved = true;
+      svg.setPointerCapture(event.pointerId);
+      svg.classList.add("is-panning");
+      moveCamera(-dx, -dy);
+      drag.x = event.clientX;
+      drag.y = event.clientY;
+    });
+    function finishDrag(event) {
+      if (!drag || drag.id !== event.pointerId) return;
+      if (drag.moved) suppressClickUntil = performance.now() + 350;
+      drag = null;
+      svg.classList.remove("is-panning");
+      if (svg.hasPointerCapture(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+    }
+    svg.addEventListener("pointerup", finishDrag);
+    svg.addEventListener("pointercancel", finishDrag);
+    svg.addEventListener("lostpointercapture", finishDrag);
+    svg.addEventListener("click", (event) => {
+      if (performance.now() < suppressClickUntil) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, true);
+    svg.addEventListener("wheel", (event) => {
+      if (event.ctrlKey || svg.classList.contains("is-zooming")) return;
+      event.preventDefault();
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? svg.clientHeight : 1;
+      moveCamera((event.shiftKey ? event.deltaY : event.deltaX) * unit, (event.shiftKey ? 0 : event.deltaY) * unit);
+    }, { passive: false });
+    svg.addEventListener("keydown", (event) => {
+      const directions = { ArrowLeft: [-40, 0], ArrowRight: [40, 0], ArrowUp: [0, -40], ArrowDown: [0, 40] };
+      if (!directions[event.key] || svg.classList.contains("is-zooming")) return;
+      event.preventDefault();
+      moveCamera(...directions[event.key]);
+    });
+  }
+
   function render() {
     closeSettings();
     app.classList.toggle("has-back", state.stack.length > 0 && state.screen !== "welcome");
@@ -843,6 +990,18 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
 
     screen.innerHTML = renderers[state.screen]();
     initializeVehicleModels();
+    initializeGaragePan();
+    if (state.screen === "retrieval") {
+      const scroller = screen.querySelector(".garage-overview-scroll");
+      const location = currentRetrieval();
+      const marker = screen.querySelector(".garage-saved-vehicle")
+        || screen.querySelector(`[data-saved-zone="${location?.zone}"]`);
+      if (scroller && marker) {
+        const bounds = marker.getBoundingClientRect();
+        scroller.scrollTop = bounds.top - scroller.getBoundingClientRect().top
+          + bounds.height / 2 - scroller.clientHeight / 2;
+      }
+    }
     screen.focus({ preventScroll: true });
   }
 
@@ -861,7 +1020,40 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
     }
 
     state.selectedStall = Number(stallElement.dataset.stall);
+    const camera = screen.querySelector(".garage-registry-plan")?.getAttribute("viewBox");
     render();
+    if (camera) screen.querySelector(".garage-registry-plan")?.setAttribute("viewBox", camera);
+    screen.querySelector(`[data-stall-id="${stallElement.dataset.stallId}"]`)?.focus({ preventScroll: true });
+  }
+
+  function selectZone(zoneId) {
+    const svg = screen.querySelector(".garage-registry-plan");
+    const scroller = screen.querySelector(".garage-overview-scroll");
+    let from = null;
+    if (svg && scroller && !state.selectedZone) {
+      overviewScrollTop = scroller.scrollTop;
+      const unitsPerPixel = svg.viewBox.baseVal.width / svg.clientWidth;
+      from = [0, scroller.scrollTop * unitsPerPixel,
+        svg.viewBox.baseVal.width, scroller.clientHeight * unitsPerPixel];
+    }
+    if (state.selectedZone !== zoneId) state.selectedStall = null;
+    state.selectedZone = zoneId;
+    render();
+    const target = screen.querySelector(".garage-registry-plan");
+    if (!from || !target || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const to = target.dataset.targetViewbox.split(" ").map(Number);
+    target.setAttribute("viewBox", from.join(" "));
+    target.classList.add("is-zooming");
+    const start = performance.now();
+    function zoom(now) {
+      if (!target.isConnected) return;
+      const progress = Math.min(1, (now - start) / 420);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      target.setAttribute("viewBox", to.map((value, index) => from[index] + (value - from[index]) * eased).join(" "));
+      if (progress < 1) requestAnimationFrame(zoom);
+      else target.classList.remove("is-zooming");
+    }
+    requestAnimationFrame(zoom);
   }
 
   screen.addEventListener("click", (event) => {
@@ -870,6 +1062,10 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
 
     if (target.dataset.action) {
       const actions = {
+        "recenter-zone": () => {
+          const plan = screen.querySelector(".garage-registry-plan");
+          if (plan) plan.setAttribute("viewBox", plan.dataset.targetViewbox);
+        },
         "warning-okay": () => navigate("setup-intro"),
         "choose-vehicle": () => navigate("vehicle-selection"),
         "choose-color": () => navigate("color-selection"),
@@ -927,6 +1123,7 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
     }
 
     if (target.dataset.level) {
+      overviewScrollTop = 0;
       state.selectedLevel = Number(target.dataset.level);
       state.selectedZone = null;
       state.selectedStall = null;
@@ -944,9 +1141,7 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
     const zone = target.closest("[data-zone]");
     if (zone) {
       event.preventDefault();
-      if (state.selectedZone !== zone.dataset.zone) state.selectedStall = null;
-      state.selectedZone = zone.dataset.zone;
-      render();
+      selectZone(zone.dataset.zone);
       return;
     }
 
@@ -968,9 +1163,7 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
     const zone = event.target.closest(".garage-zone-region[data-zone]");
     if (zone) {
       event.preventDefault();
-      state.selectedZone = zone.dataset.zone;
-      state.selectedStall = null;
-      render();
+      selectZone(zone.dataset.zone);
     }
   });
 
@@ -1006,9 +1199,6 @@ import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
   });
 
   window.addEventListener("popstate", () => showToast("Use the in-app back arrow in this prototype."));
-  portraitGarageQuery.addEventListener("change", () => {
-    if (state.screen === "zone-selection" && !state.selectedZone) render();
-  });
   if ("serviceWorker" in navigator && /^https?:$/.test(window.location.protocol)) {
     window.addEventListener(
       "load",

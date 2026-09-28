@@ -11,7 +11,7 @@ try {
 }
 const MODELS = self.PARKING_HELPER_MODELS || FALLBACK_MODELS;
 
-const CACHE_NAME = `parking-helper-shell-v3-${MODELS.version}`;
+const CACHE_NAME = `parking-helper-shell-v5-${MODELS.version}`;
 const PRECACHE_URLS = [
   "./",
   "./index.html",

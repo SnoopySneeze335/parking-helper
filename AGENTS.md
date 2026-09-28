@@ -74,10 +74,10 @@ Plan.md, prompt.txt, and STORAGE_DESIGN.md are currently local-only and ignored 
 - All SUV presentation values (camera orbit, field of view, camera target, exposure, shadows, environment) live in the `SUV_MODEL` constant at the top of app.js and apply at runtime in the browser. Geometry, scale, material names, and non-body colours require a Blender re-export.
 - A service worker precaches the app shell, model-viewer bundle, model manifest, and the versioned SUV GLB URL for same-origin offline use. Its cache name includes the manifest version, so a re-export produces a new cache and the old one is deleted on activate.
 - Garage levels are 1-6. Levels 2-5 use the AutoCAD-derived feature and zone geometry for the initial zone overview, with full zone IDs presented as friendly letters A-R. The overview rotates into a vertically scrolling plan on portrait phones.
-- Selecting a real overview zone deliberately hands off to the existing A-D placeholder zone-detail/stall path; those later views have not yet been converted to registry geometry. Levels 1 and 6 also retain the placeholder overview.
+- Levels 2-5 use a vertical SVG plan within the app column at every browser width. Selecting a zone animates its viewBox to the zone and reveals registry-sized stall hitboxes with upright numbers. Drag, wheel/trackpad, and arrow-key panning preserve all structural landmarks and show neighboring stalls faded; Recenter zone restores the initial view. Selecting a stall preserves the panned view. Back clears the selection and restores the overview scroll position before returning to level selection on the next Back. Levels 1 and 6 retain placeholder geometry.
 - The validated floor registries are compiled into data/garage/registry-bundle.js and imported with app.js, so the app makes no runtime JSON request. Rerun `node garage-plans-tools/bundle_garage_registries.mjs` after registry changes.
 - The save flow supports floor, zone, and optional stall selection.
-- Retrieval shows a vehicle for a stall-specific save and a zone focus without a vehicle for a zone-only save.
+- Retrieval on Levels 2-5 reuses the registry overview with no stall outlines. It highlights the saved zone, overlays the current vehicle artwork (including the tinted SUV GLB) at the saved stall center, and scrolls that location into view at overview scale. Zone-only saves highlight the zone without a car. The history list's Find my car action uses the same retrieval view; its small inline preview remains a placeholder.
 - Parking history previews a selected record and can hand that record to the retrieval screen.
 - Settings routes to vehicle selection or an About placeholder.
 
@@ -205,7 +205,7 @@ localStorage is origin-scoped. Data saved on a pages.dev preview address will no
 ### P1 — Offline and product completion
 
 - [ ] Add an installable web-app manifest and final home-screen instructions.
-- [ ] Replace the remaining placeholder zone-detail, stall-selection, retrieval, and history geometry with accurate floor-specific maps and stalls.
+- [ ] Replace the remaining placeholder inline history preview and Level 1/6 maps with accurate floor-specific maps and stalls.
 - [ ] Replace CSS vehicle placeholders with approved image/3D assets.
 - [ ] Add final About Parking Helper content.
 - [ ] Review accessibility with keyboard, screen reader, reduced motion, and touch targets.
@@ -230,6 +230,10 @@ localStorage is origin-scoped. Data saved on a pages.dev preview address will no
 - Which custom domain will be the permanent localStorage origin?
 
 ## Completed work log
+
+- **2026-09-28:** Added bounded detail-map panning with faded neighboring stalls and full landmarks, drag-versus-tap handling, and recentering. Retrieval now uses the full registry overview with the selected vehicle at its saved stall and a zone-only fallback.
+
+- **2026-09-28:** Made the registry plan vertical regardless of outer browser orientation; added animated zone focus, accurate registry stall hitboxes and upright numbers, keyboard selection, reduced-motion handling, and Back-to-overview with restored scrolling.
 
 - **2026-09-27:** Replaced the Level 2-5 zone overview placeholder with an offline-bundled, AutoCAD-derived SVG renderer for structural features and 18 tappable zones, including phone rotation/scrolling and friendly A-R labels; later garage views remain placeholders.
 
