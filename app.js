@@ -1,3 +1,5 @@
+import GARAGE_REGISTRIES from "./data/garage/registry-bundle.js";
+
 (() => {
   "use strict";
 
@@ -94,6 +96,13 @@
   // to load we still point at the plain GLB so the model never disappears.
   const SUV_MODEL_URL = (window.PARKING_HELPER_MODELS && window.PARKING_HELPER_MODELS.suv)
     || "assets/models/suv.glb";
+
+  const GARAGE_RENDER_MODES = Object.freeze({
+    overview: "overview",
+    zoneDetail: "zone-detail",
+    savedLocation: "saved-location",
+  });
+  const portraitGarageQuery = window.matchMedia("(max-width: 699px) and (orientation: portrait)");
 
   const screen = document.querySelector("#screen");
   const app = document.querySelector("#app");
@@ -386,6 +395,140 @@
     return `top:${base.top + rowOffset}%;left:${base.left + columnOffset}%`;
   }
 
+  function garageRegistryForLevel(level) {
+    return GARAGE_REGISTRIES[`F${level}`] || null;
+  }
+
+  function zoneFriendlyLabel(zoneId) {
+    const match = /-Z(\d+)$/.exec(zoneId || "");
+    if (!match) return zoneId;
+
+    let number = Number(match[1]);
+    let label = "";
+    while (number > 0) {
+      number -= 1;
+      label = String.fromCharCode(65 + (number % 26)) + label;
+      number = Math.floor(number / 26);
+    }
+    return label;
+  }
+
+  function polygonCenter(vertices) {
+    let twiceArea = 0;
+    let centerX = 0;
+    let centerY = 0;
+
+    for (let index = 0; index < vertices.length; index += 1) {
+      const current = vertices[index];
+      const next = vertices[(index + 1) % vertices.length];
+      const cross = (current[0] * next[1]) - (next[0] * current[1]);
+      twiceArea += cross;
+      centerX += (current[0] + next[0]) * cross;
+      centerY += (current[1] + next[1]) * cross;
+    }
+
+    if (Math.abs(twiceArea) > 0.000001) {
+      return [centerX / (3 * twiceArea), centerY / (3 * twiceArea)];
+    }
+
+    const totals = vertices.reduce(
+      (result, vertex) => [result[0] + vertex[0], result[1] + vertex[1]],
+      [0, 0],
+    );
+    return [totals[0] / vertices.length, totals[1] / vertices.length];
+  }
+
+  function garageCoordinateFrame(bounds, portrait) {
+    const planWidth = bounds.maxX - bounds.minX;
+    const planHeight = bounds.maxY - bounds.minY;
+    const margin = Math.max(4, Math.min(planWidth, planHeight) * 0.04);
+
+    return {
+      width: (portrait ? planHeight : planWidth) + (margin * 2),
+      height: (portrait ? planWidth : planHeight) + (margin * 2),
+      point([x, y]) {
+        if (portrait) {
+          // Rotate the wide plan into the phone's vertical reading direction.
+          // The DXF Y inversion is included here, so SVG hit areas and artwork
+          // share exactly the same coordinates (there is no CSS transform).
+          return [margin + bounds.maxY - y, margin + x - bounds.minX];
+        }
+        return [margin + x - bounds.minX, margin + bounds.maxY - y];
+      },
+    };
+  }
+
+  function svgPoints(vertices, frame) {
+    return vertices
+      .map((vertex) => frame.point(vertex).map((coordinate) => coordinate.toFixed(2)).join(","))
+      .join(" ");
+  }
+
+  function garageFeatureMarkup(featureName, shapes, frame) {
+    return shapes.map((shape) => {
+      const vertices = Array.isArray(shape.vertices) ? shape.vertices : [];
+      if (vertices.length < 2) return "";
+
+      const closed = Boolean(shape.closed) && vertices.length >= 3;
+      const element = closed ? "polygon" : "polyline";
+      return `<${element} class="garage-feature garage-feature--${featureName}${closed ? " is-closed" : " is-open"}"
+        points="${svgPoints(vertices, frame)}" vector-effect="non-scaling-stroke"></${element}>`;
+    }).join("");
+  }
+
+  function garageOverviewMarkup(registry, frame) {
+    const featureOrder = ["deck", "wall", "ramp", "vertical", "marking", "column"];
+    const features = featureOrder.map((featureName) => garageFeatureMarkup(
+      featureName,
+      registry.features?.[featureName] || [],
+      frame,
+    )).join("");
+
+    const zones = registry.zones.map((zone) => {
+      const label = zoneFriendlyLabel(zone.id);
+      const [labelX, labelY] = frame.point(polygonCenter(zone.boundary));
+      const stallLabel = `${zone.stall_count} ${zone.stall_count === 1 ? "stall" : "stalls"}`;
+      return `
+        <a class="garage-zone-region" href="#" data-zone="${zone.id}" role="button"
+          aria-label="Zone ${label}, ${stallLabel}">
+          <polygon class="garage-zone-shape" points="${svgPoints(zone.boundary, frame)}"
+            vector-effect="non-scaling-stroke"></polygon>
+          <text class="garage-zone-label" x="${labelX.toFixed(2)}" y="${labelY.toFixed(2)}"
+            text-anchor="middle" aria-hidden="true">
+            <tspan class="garage-zone-letter" x="${labelX.toFixed(2)}" dy="-0.55">${label}</tspan>
+            <tspan class="garage-zone-count" x="${labelX.toFixed(2)}" dy="3.35">${stallLabel}</tspan>
+          </text>
+        </a>`;
+    }).join("");
+
+    return `<g class="garage-feature-layer" aria-hidden="true">${features}</g>
+      <g class="garage-zone-layer" aria-label="Parking zones">${zones}</g>`;
+  }
+
+  function garageRegistryRenderer(
+    registry,
+    { mode = GARAGE_RENDER_MODES.overview, highlightedStall = null } = {},
+  ) {
+    if (mode !== GARAGE_RENDER_MODES.overview) {
+      throw new Error(`Garage renderer mode ${mode} is not implemented yet.`);
+    }
+
+    const portrait = portraitGarageQuery.matches;
+    const frame = garageCoordinateFrame(registry.bounds, portrait);
+    const highlightedStallAttribute = highlightedStall
+      ? ` data-highlighted-stall="${highlightedStall}"`
+      : "";
+
+    return `
+      <svg class="garage-registry-plan garage-registry-plan--${portrait ? "portrait" : "landscape"}"
+        viewBox="0 0 ${frame.width.toFixed(2)} ${frame.height.toFixed(2)}"
+        preserveAspectRatio="xMidYMid meet" role="group" aria-labelledby="garage-plan-title"
+        data-render-mode="${mode}"${highlightedStallAttribute}>
+        <title id="garage-plan-title">Level ${registry.floor.slice(1)} garage zone overview</title>
+        ${garageOverviewMarkup(registry, frame)}
+      </svg>`;
+  }
+
   function garagePlan({ interactive = false, selectedZone = null, selectedStall = null, parkedLocation = null, preview = false } = {}) {
     const zones = ["A", "B", "C", "D"];
     return `
@@ -562,15 +705,20 @@
   function renderZoneSelection() {
     const hasZone = Boolean(state.selectedZone);
     const hasStall = Boolean(state.selectedStall);
+    const registry = garageRegistryForLevel(state.selectedLevel);
+    const showRegistryOverview = Boolean(registry && !hasZone);
+    const friendlyZone = zoneFriendlyLabel(state.selectedZone);
     return `
       <div class="screen-garage">
         <div class="screen-heading compact">
           <p class="eyebrow dark">Level ${state.selectedLevel}</p>
-          <h1>${hasZone ? `Zone ${state.selectedZone} selected` : "Choose a zone."}</h1>
+          <h1>${hasZone ? `Zone ${friendlyZone} selected` : "Choose a zone."}</h1>
           <p class="lede dark">${hasZone ? "Save the zone now, or tap an outlined stall for extra detail." : "Tap the blue area where you parked."}</p>
         </div>
-        <div class="garage-plan-wrap">
-          ${garagePlan({ interactive: true, selectedZone: state.selectedZone, selectedStall: state.selectedStall })}
+        <div class="garage-plan-wrap${showRegistryOverview ? " registry-overview" : ""}">
+          ${showRegistryOverview
+            ? `<div class="garage-overview-scroll">${garageRegistryRenderer(registry, { mode: GARAGE_RENDER_MODES.overview })}</div>`
+            : garagePlan({ interactive: true, selectedZone: state.selectedZone, selectedStall: state.selectedStall })}
           <div class="garage-hint">${hasZone ? (hasStall ? `Stall ${state.selectedStall} selected` : "Optional: choose a stall") : "Blue outlines are parking zones"}</div>
         </div>
         ${hasZone ? `<button class="primary-button blue floating-save" type="button" data-action="save-location">${hasStall ? "Save spot" : "Save zone"}</button>` : ""}
@@ -717,7 +865,7 @@
   }
 
   screen.addEventListener("click", (event) => {
-    const target = event.target.closest("button, [data-stall]");
+    const target = event.target.closest("button, [data-stall], [data-zone]");
     if (!target) return;
 
     if (target.dataset.action) {
@@ -795,6 +943,7 @@
 
     const zone = target.closest("[data-zone]");
     if (zone) {
+      event.preventDefault();
       if (state.selectedZone !== zone.dataset.zone) state.selectedStall = null;
       state.selectedZone = zone.dataset.zone;
       render();
@@ -808,9 +957,20 @@
   });
 
   screen.addEventListener("keydown", (event) => {
-    if ((event.key === "Enter" || event.key === " ") && event.target.matches("[data-stall]")) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+
+    if (event.target.matches("[data-stall]")) {
       event.preventDefault();
       selectStall(event.target);
+      return;
+    }
+
+    const zone = event.target.closest(".garage-zone-region[data-zone]");
+    if (zone) {
+      event.preventDefault();
+      state.selectedZone = zone.dataset.zone;
+      state.selectedStall = null;
+      render();
     }
   });
 
@@ -846,6 +1006,9 @@
   });
 
   window.addEventListener("popstate", () => showToast("Use the in-app back arrow in this prototype."));
+  portraitGarageQuery.addEventListener("change", () => {
+    if (state.screen === "zone-selection" && !state.selectedZone) render();
+  });
   if ("serviceWorker" in navigator && /^https?:$/.test(window.location.protocol)) {
     window.addEventListener(
       "load",

@@ -555,6 +555,88 @@ h2 { margin-bottom: 8px; font-size: clamp(1.7rem, 7vw, 2.3rem); line-height: 1; 
   perspective: 900px;
 }
 
+.garage-plan-wrap.registry-overview {
+  display: block;
+  min-height: 0;
+  padding: 0;
+  perspective: none;
+}
+
+.garage-overview-scroll {
+  width: 100%;
+  max-height: calc(100dvh - 278px - env(safe-area-inset-top));
+  min-height: 280px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 7px solid #77717e;
+  border-radius: 16px;
+  background: #d9d6dc;
+  box-shadow: var(--shadow);
+  overscroll-behavior: contain;
+  scrollbar-color: #8b858e #d9d6dc;
+  scrollbar-width: thin;
+}
+
+.garage-registry-plan {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #d9d6dc;
+  shape-rendering: geometricPrecision;
+}
+
+.garage-feature {
+  fill: none;
+  stroke: #8d8790;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1;
+}
+
+.garage-feature--deck,
+.garage-feature--wall { stroke: #716b75; stroke-width: 1.2; }
+.garage-feature--column.is-closed { fill: #716c75; stroke: #5f5962; }
+.garage-feature--vertical.is-closed,
+.garage-feature--ramp.is-closed { fill: #bbb7bf; stroke: #8a848d; }
+.garage-feature--marking { stroke: #aaa5ae; stroke-width: .65; }
+.garage-feature--marking.is-closed { fill: #c9c5cc; }
+
+.garage-zone-region { cursor: pointer; outline: none; }
+.garage-zone-shape {
+  fill: rgb(43 156 237 / 8%);
+  stroke: var(--blue);
+  stroke-linejoin: round;
+  stroke-width: 1.45;
+  transition: fill 160ms ease, stroke 160ms ease;
+}
+
+.garage-zone-region:hover .garage-zone-shape,
+.garage-zone-region:focus-visible .garage-zone-shape {
+  fill: rgb(43 156 237 / 19%);
+  stroke: var(--blue-dark);
+  stroke-width: 2.2;
+}
+
+.garage-zone-label {
+  fill: var(--blue-dark);
+  stroke: rgb(255 255 255 / 96%);
+  stroke-linejoin: round;
+  stroke-width: 1.35;
+  font-weight: 900;
+  paint-order: stroke fill;
+  pointer-events: none;
+}
+
+.garage-zone-letter { font-size: 4.4px; }
+.garage-zone-count { font-size: 2.45px; letter-spacing: -.08px; }
+
+.registry-overview .garage-hint {
+  position: static;
+  width: max-content;
+  margin: 10px auto 0;
+  transform: none;
+}
+
 .garage-plan {
   position: relative;
   width: min(92vw, 460px);
@@ -858,4 +940,5 @@ h2 { margin-bottom: 8px; font-size: clamp(1.7rem, 7vw, 2.3rem); line-height: 1; 
   .overlay { inset: 24px 0; border-radius: 34px; overflow: hidden; }
   .floating-save { bottom: 44px; }
   .history-layout { height: calc(100dvh - 120px - env(safe-area-inset-top)); }
+  .garage-overview-scroll { min-height: 0; max-height: none; overflow: visible; }
 }

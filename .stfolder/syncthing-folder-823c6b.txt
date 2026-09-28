@@ -1,0 +1,5 @@
+# This directory is a Syncthing folder marker.
+# Do not delete.
+
+folderID: parking-helper-desktop
+created: 2026-09-24T15:22:38-07:00
